@@ -1,0 +1,8 @@
+beautifulsoup4
+natsort
+numpy
+Pillow
+PyPDF2
+reportlab
+Requests
+tqdm
