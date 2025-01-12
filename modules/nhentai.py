@@ -4,6 +4,14 @@ import PIL
 from tqdm import tqdm
 
 
+class Nhentai:
+
+    def __init__(self):
+        self.name = ''
+        self.final = ''
+        self.id = ''
+        self.formatt = ''
+
 def get_images(infos: list) -> None:
     """
     :param infos: dict 'name', 'final', 'formatt'
@@ -26,7 +34,10 @@ def get_images(infos: list) -> None:
                 print(e)
                 exit(1)
             # d:\Akisamu\Desktop\output\{i}.jpg
-            with open(f'{i}.jpg', 'wb') as out_file:
+            with open(
+                    os.path.join('..', 'cache', f'{i}.jpg'),
+                    'wb'
+            ) as out_file:
                 out_file.write(r.content)
 
         # --- 把输出改了，改成类变量？  ---
