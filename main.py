@@ -1,10 +1,11 @@
 from modules import eromanga, nhentai
+from modules.ptf.i2p import I2P
 
 '''
 param url: 'https://eromanga-show.com/viewer?articleId=n&page=n'
 '''
 urls = [
-
+    '233'
 ]
 
 """
@@ -16,7 +17,12 @@ urls = [
     }
 """
 infos = [
-
+    {
+        'name': '',
+        'final': 1,
+        'id': 1,
+        'format': 'jpg'
+    }
 ]
 
 
@@ -29,7 +35,10 @@ if __name__ == '__main__':
     exit(0)
 
     if is_empty(infos) is False:
-        n_hentai.download(infos=infos)
+        for info in infos:
+            image = nhentai.get_images(info)
+            I2P(images=image, pdf_name=info['name'], quality=75)
+
     if is_empty(urls) is False:
         eromanga.download(urls=urls)
 
