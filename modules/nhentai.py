@@ -1,20 +1,19 @@
 import sys, os, io
 import requests
-from PIL import Image, UnidentifiedImageError
-from PIL.Image import Image
+from PIL import UnidentifiedImageError, Image
 from tqdm import tqdm
 
 def check_image_integrity(image: Image) -> bool:
     re = True
     try:
-        Image.load()
+        image.load()
     except (IOError, UnidentifiedImageError) as e:
         print(f"Image is corrupted or invalid. Error: {e}")
         re = False
     return re
 
 
-def get_images(info: dict) -> None:
+def get_images(info: dict) -> list:
     """
     :param info: 'final', 'formatt'
     :return:
@@ -31,6 +30,8 @@ def get_images(info: dict) -> None:
         image = Image.open(image_data)
         if check_image_integrity(image):
             images.append(Image.open(image_data))
+    print(f'Length of images: {len(images)}')
+    return  images
 
 
 
