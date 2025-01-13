@@ -33,7 +33,7 @@ def download(urls: list) -> None:
         for image_url in tqdm(images_url_list, desc=f'minssion : {missison_counter}/{mission_number}'):
             image = requests.get(image_url).content
             formatt = image_url.split('.')[-1]
-            with open(f'{os.path.join("..", "cache", f"{index}.{formatt}")}', 'wb') as out_file:
+            with open(f'{os.path.join("cache", f"{index}.{formatt}")}', 'wb') as out_file:
                 out_file.write(image)
                 index += 1
 
