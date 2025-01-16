@@ -1,5 +1,4 @@
 import sys, os, io
-
 import PIL
 import requests
 from PIL import UnidentifiedImageError, Image
