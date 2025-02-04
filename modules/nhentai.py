@@ -1,17 +1,20 @@
 import sys, os, io
+import PIL
 import requests
 from PIL import UnidentifiedImageError, Image
 from tqdm import tqdm
+from modules.ptf.i2p import I2P
+
+
 
 def check_image_integrity(image: Image) -> bool:
     re = True
     try:
         image.load()
-    except (IOError, UnidentifiedImageError) as e:
+    except (IOError, PIL.UnidentifiedImageError) as e:
         print(f"Image is corrupted or invalid. Error: {e}")
         re = False
     return re
-
 
 def get_images(info: dict) -> list:
     """
@@ -29,7 +32,7 @@ def get_images(info: dict) -> list:
         image_data = io.BytesIO(r.content)
         image = Image.open(image_data)
         if check_image_integrity(image):
-            images.append(Image.open(image_data))
+            images.append(image)
     print(f'Length of images: {len(images)}')
     return  images
 
