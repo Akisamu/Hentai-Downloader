@@ -5,8 +5,8 @@
 *.png
 
 # Download history
-outputs/-history/
-!outputs/-history/thumbnails/.keep
+outputs/history/
+!outputs/history/thumbnails/.keep
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
