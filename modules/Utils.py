@@ -202,7 +202,7 @@ def record_history(output_dir: str, /, *, name: str, url: str,
         'url': url,
         'total': total,
         'downloaded': downloaded,
-        'timestamp': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+        'timestamp': datetime.now().astimezone().isoformat(timespec='seconds'),
     }
     if thumb:
         record['thumb'] = thumb
