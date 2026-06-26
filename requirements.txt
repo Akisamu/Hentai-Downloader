@@ -1,8 +1,6 @@
-natsort
-numpy
-Pillow
-PyPDF2
-reportlab
-Requests
-tqdm
 beautifulsoup4
+natsort
+pillow
+reportlab
+requests
+tqdm
