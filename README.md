@@ -2,6 +2,12 @@
 
 Download doujinshi from nhentai.com and eromanga-show.com, package as PDF. Includes a Gradio web UI and terminal CLI.
 
+**Sources**
+
+<img src="assets/icon_comics.webp" width="18" height="18"> [nhentai.com/hentai-comics](https://nhentai.com/hentai-comics)
+&nbsp;&nbsp;
+<img src="assets/icon_eromanga.png" width="18" height="18"> [eromanga-show.com](https://eromanga-show.com/)
+
 ## Installation
 
 ```bash
