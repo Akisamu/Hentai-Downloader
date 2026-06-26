@@ -53,7 +53,7 @@ nhentai_urls = ['https://nhentai.com/en/comic/...']
 eromanga_urls = ['https://eromanga-show.com/articles/...']
 
 # Mode C — manual metadata
-infos = [{'name': '...', 'final': 70, 'id': 616696, 'format': 'webp'}]
+infos = [{'name': '...', 'final': ..., 'id': ..., 'format': '...'}]
 ```
 
 ## Output structure

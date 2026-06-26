@@ -35,8 +35,12 @@ def _get_lan_ip() -> str:
     except OSError:
         return '127.0.0.1'
 
-# ---- icon paths ----
-_ROOT = os.path.dirname(os.path.abspath(__file__))
+# ---- icon paths (support PyInstaller --onefile) ----
+import sys as _sys
+if getattr(_sys, 'frozen', False):
+    _ROOT = _sys._MEIPASS
+else:
+    _ROOT = os.path.dirname(os.path.abspath(__file__))
 _COMICS_ICON = os.path.join(_ROOT, 'comics.icon.webp')
 _EROMANGA_ICON = os.path.join(_ROOT, 'eromanga.icon.png')
 

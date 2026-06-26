@@ -127,12 +127,12 @@ def compress_existing_pdf(input_path: str, output_path: str | None = None) -> st
 
 
 # ======================================================================
-#  Download history  (stored under ``<output_dir>/.history/``)
+#  Download history  (stored under ``<output_dir>/-history/``)
 # ======================================================================
 
 def _history_dir(output_dir: str) -> str:
     """Return the path to the .history folder (create it if missing)."""
-    path = os.path.join(output_dir, '.history')
+    path = os.path.join(output_dir, '-history')
     # If an old flat file exists, rename it away before creating the directory
     if os.path.isfile(path):
         tmp = path + '.old'
@@ -152,11 +152,11 @@ def _history_thumb_dir(output_dir: str) -> str:
 
 
 def _migrate_old_history(output_dir: str) -> None:
-    """One-off: move old ``.history`` file / ``thumbnails/`` dir into the new folder."""
+    """One-off: move old ``.history`` / ``-history`` files into the ``-history/`` folder."""
     new_info = _history_info_path(output_dir)
 
-    # Old flat .history file (or .history.old from a previous rename)
-    for old_name in ('.history', '.history.old'):
+    # Old flat .history or -history files
+    for old_name in ('.history', '.history.old', '-history'):
         old_path = os.path.join(output_dir, old_name)
         if os.path.isfile(old_path) and not os.path.exists(new_info):
             os.rename(old_path, new_info)
@@ -166,18 +166,31 @@ def _migrate_old_history(output_dir: str) -> None:
     old_thumb = os.path.join(output_dir, 'thumbnails')
     new_thumb = os.path.join(_history_dir(output_dir), 'thumbnails')
     if os.path.isdir(old_thumb) and not os.path.isdir(new_thumb):
-        # rmdir the empty new_thumb placeholder if it exists
         try:
             os.rmdir(new_thumb)
         except OSError:
             pass
         os.rename(old_thumb, new_thumb)
 
+    # Migrate from old -history/ dir to -history/ dir
+    old_dir = os.path.join(output_dir, '.history')
+    new_dir = os.path.join(output_dir, '-history')
+    if os.path.isdir(old_dir) and old_dir != new_dir:
+        for item in os.listdir(old_dir):
+            old_item = os.path.join(old_dir, item)
+            new_item = os.path.join(new_dir, item)
+            if not os.path.exists(new_item):
+                os.rename(old_item, new_item)
+        try:
+            os.rmdir(old_dir)
+        except OSError:
+            pass
+
 
 def record_history(output_dir: str, /, *, name: str, url: str,
                    total: int, downloaded: int, thumb: str = '') -> None:
     """
-    Append one download record to ``<output_dir>/.history/info`` (JSON Lines).
+    Append one download record to ``<output_dir>/-history/info`` (JSON Lines).
 
     :param thumb: unique thumbnail filename from :func:`save_thumbnail`.
     """
@@ -200,7 +213,7 @@ def record_history(output_dir: str, /, *, name: str, url: str,
 
 def get_history(output_dir: str) -> list[dict]:
     """
-    Read all history records from ``<output_dir>/.history/info``.
+    Read all history records from ``<output_dir>/-history/info``.
 
     Returns a list of dicts (most recent first).  Missing / empty file → ``[]``.
     """
@@ -224,7 +237,7 @@ def get_history(output_dir: str) -> list[dict]:
 
 
 # ======================================================================
-#  Thumbnails  (stored under ``<output_dir>/.history/thumbnails/``)
+#  Thumbnails  (stored under ``<output_dir>/-history/thumbnails/``)
 # ======================================================================
 
 def _sanitize_filename(name: str) -> str:
