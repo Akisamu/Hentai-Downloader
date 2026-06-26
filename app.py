@@ -23,6 +23,18 @@ from modules.ptf.i2p import I2P
 # Port for the inline PDF preview server (separate from Gradio's 7860)
 _PREVIEW_PORT = 7861
 
+def _get_lan_ip() -> str:
+    """Return the machine's LAN IP, falling back to 127.0.0.1."""
+    try:
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except OSError:
+        return '127.0.0.1'
+
 # ---- icon paths ----
 _ROOT = os.path.dirname(os.path.abspath(__file__))
 _COMICS_ICON = os.path.join(_ROOT, 'comics.icon.webp')
@@ -142,7 +154,7 @@ def _pdf_link(path: str) -> str:
         return ""
     encoded = urllib.parse.quote(path, safe='')
     return (
-        f'<a href="http://127.0.0.1:{_PREVIEW_PORT}/preview?path={encoded}" target="_blank" '
+        f'<a href="http://{_get_lan_ip()}:{_PREVIEW_PORT}/preview?path={encoded}" target="_blank" '
         f'style="display:inline-block;padding:8px 20px;background:#2563eb;color:#fff;'
         f'border-radius:6px;text-decoration:none;font-weight:600;">'
         f'Preview PDF in browser</a>'
@@ -384,7 +396,7 @@ def _start_preview_server(port: int = _PREVIEW_PORT):
         def log_message(self, format, *args):
             pass  # suppress logs
 
-    server = HTTPServer(('127.0.0.1', port), PreviewHandler)
+    server = HTTPServer(('0.0.0.0', port), PreviewHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server
@@ -428,8 +440,10 @@ if __name__ == '__main__':
     """
     demo = build_ui()
 
+    lan_ip = _get_lan_ip()
+    print(f"LAN access: http://{lan_ip}:7860")
     demo.launch(
-        server_name="127.0.0.1",
+        server_name="0.0.0.0",
         server_port=7860,
         share=False,
         inbrowser=True,
