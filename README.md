@@ -66,6 +66,10 @@ outputs/
   *.pdf               ← generated PDFs
 ```
 
+## Portable EXE
+
+Download `ERO-Downloader.zip` from [Releases](../../releases), unzip anywhere, and double-click `ERO-Downloader.exe`. No Python or dependencies required — everything is bundled inside the 80 MB executable.
+
 ## Dependencies
 
 `beautifulsoup4` `gradio` `natsort` `pillow` `reportlab` `requests` `tqdm`
