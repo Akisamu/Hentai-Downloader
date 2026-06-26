@@ -170,7 +170,7 @@ def _pipeline_hentai_comics(url: str, quality: int, max_dim: int, progress: gr.P
         yield "[X] No images downloaded.", None, None, ""
         return
 
-    yield f"[OK] Downloaded {len(images)}/{total} pages", None, None, "", "", gr.Dropdown()
+    yield f"[OK] Downloaded {len(images)}/{total} pages", None, None, ""
     progress(0.55, desc=f"Compressing {len(images)} images (JPEG q={quality}) …")
 
     thumb_path = save_thumbnail(images[0], I2P.output_dir, name)
@@ -221,7 +221,7 @@ def _pipeline_eromanga(url: str, quality: int, max_dim: int, progress: gr.Progre
         yield "[X] No images downloaded.", None, None, ""
         return
 
-    yield f"[OK] Downloaded {len(images)}/{total} pages", None, None, "", "", gr.Dropdown()
+    yield f"[OK] Downloaded {len(images)}/{total} pages", None, None, ""
     progress(0.55, desc=f"Compressing {len(images)} images (JPEG q={quality}) …")
 
     thumb_path = save_thumbnail(images[0], I2P.output_dir, name)
@@ -301,7 +301,7 @@ def _build_download_tab(placeholder: str, info: str, pipeline_fn,
 
 def build_ui():
     with gr.Blocks(title="Hentai Downloader") as app:
-        gr.Markdown("# 📚 Hentai Downloader")
+        gr.Markdown("Hentai Downloader")
         gr.Markdown("Paste a comic URL, click download, get a PDF.")
 
         # History tab first (for component creation / cross-tab sync),
