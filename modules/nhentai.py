@@ -1,4 +1,5 @@
 import io
+import json
 import random
 import re
 import time
@@ -81,14 +82,14 @@ def scrape_info(url: str) -> dict | None:
     title = _extract_title(soup, url)
 
     # ---- step 3: extract gallery ID and total pages ----
-    gallery_id, final = _extract_id_and_pages(soup, r.text, url)
+    gallery_id, final = _extract_id_and_pages(soup, r.text)
 
     if gallery_id is None or final is None:
         print("[ERROR] Could not determine gallery ID or page count.")
         return None
 
     # ---- step 4: derive CDN base from the thumbnail URL in JSON-LD ----
-    cdn_base = _derive_cdn_base_from_page(soup, r.text, gallery_id)
+    cdn_base = _derive_cdn_base_from_page(soup, gallery_id)
 
     # ---- step 5: image format — default to webp; the fallback mechanism
     #              in get_images() tries jpg/png automatically on 404 ----
@@ -107,20 +108,29 @@ def scrape_info(url: str) -> dict | None:
     return info
 
 
-def _extract_title(soup: BeautifulSoup, url: str) -> str:
-    """Extract the doujin title from the page."""
-    import json
-
-    # Strategy 1: JSON-LD ComicIssue name (cleanest)
+def _get_jsonld_comic_issue(soup: BeautifulSoup) -> dict | None:
+    """Return the parsed ``ComicIssue`` JSON-LD block from the page, or *None*."""
     for script in soup.find_all('script', type='application/ld+json'):
+        if not script.string:
+            continue
         try:
             data = json.loads(script.string)
             if isinstance(data, dict) and data.get('@type') == 'ComicIssue':
-                name = data.get('name', '').strip()
-                if name:
-                    return name
+                return data
         except (json.JSONDecodeError, ValueError, TypeError):
             pass
+    return None
+
+
+def _extract_title(soup: BeautifulSoup, url: str) -> str:
+    """Extract the doujin title from the page."""
+
+    # Strategy 1: JSON-LD ComicIssue name (cleanest)
+    ld = _get_jsonld_comic_issue(soup)
+    if ld:
+        name = ld.get('name', '').strip()
+        if name:
+            return name
 
     # Strategy 2: <title> tag (strip site suffix)
     if soup.title and soup.title.string:
@@ -146,7 +156,7 @@ def _extract_title(soup: BeautifulSoup, url: str) -> str:
     return slug.replace('-', ' ').title()
 
 
-def _extract_id_and_pages(soup: BeautifulSoup, html: str, url: str) -> tuple[int | None, int | None]:
+def _extract_id_and_pages(soup: BeautifulSoup, html: str) -> tuple[int | None, int | None]:
     """
     Extract (gallery_id, total_pages) using multiple strategies.
     Primary strategy: JSON-LD ComicIssue block.
@@ -155,31 +165,18 @@ def _extract_id_and_pages(soup: BeautifulSoup, html: str, url: str) -> tuple[int
     final = None
 
     # ---- Strategy 1: JSON-LD structured data ----
-    import json
-    for script in soup.find_all('script', type='application/ld+json'):
-        try:
-            data = json.loads(script.string)
-            if not isinstance(data, dict):
-                continue
+    ld = _get_jsonld_comic_issue(soup)
+    if ld:
+        pages = ld.get('numberOfPages')
+        if pages:
+            final = int(pages)
 
-            # We only care about the ComicIssue block
-            if data.get('@type') != 'ComicIssue':
-                continue
-
-            # page count
-            pages = data.get('numberOfPages')
-            if pages:
-                final = int(pages)
-
-            # gallery ID — extract from the "image" URL
-            # e.g. "https://cdn.nhentai.com/nhentai/storage/comics/616696.jpg"
-            image_url = data.get('image', '')
-            m = re.search(r'/comics/(\d+)\.', image_url)
-            if m:
-                gallery_id = int(m.group(1))
-
-        except (json.JSONDecodeError, ValueError, TypeError):
-            pass
+        # gallery ID — extract from the "image" URL
+        # e.g. "https://cdn.nhentai.com/nhentai/storage/comics/616696.jpg"
+        image_url = ld.get('image', '')
+        m = re.search(r'/comics/(\d+)\.', image_url)
+        if m:
+            gallery_id = int(m.group(1))
 
     # ---- Strategy 2: regex on inline JS / data attributes ----
     if not gallery_id:
@@ -201,44 +198,34 @@ def _extract_id_and_pages(soup: BeautifulSoup, html: str, url: str) -> tuple[int
     # ---- Strategy 3: count reader-page links ----
     if not final:
         reader_links = soup.find_all('a', href=re.compile(r'/reader/\d+'))
-        page_nums = set()
-        for a in reader_links:
-            m = re.search(r'/reader/(\d+)', a.get('href', ''))
-            if m:
-                page_nums.add(int(m.group(1)))
+        page_nums = {int(m.group(1)) for a in reader_links
+                     if (m := re.search(r'/reader/(\d+)', a.get('href', '')))}
         if page_nums:
             final = max(page_nums)
 
     return gallery_id, final
 
 
-def _derive_cdn_base_from_page(soup: BeautifulSoup, html: str, gallery_id: int) -> str:
+def _derive_cdn_base_from_page(soup: BeautifulSoup, gallery_id: int) -> str:
     """
     Derive the CDN base URL from the main page.
     Looks at the JSON-LD ``image`` field and the ``<link rel="preconnect">`` tag.
     Falls back to CDN_CANDIDATES[0].
     """
-    import json
-
     # Strategy 1: extract from JSON-LD image URL
-    for script in soup.find_all('script', type='application/ld+json'):
-        try:
-            data = json.loads(script.string)
-            if isinstance(data, dict) and data.get('@type') == 'ComicIssue':
-                image_url = data.get('image', '')
-                if image_url:
-                    cdn = _derive_cdn_base(image_url, gallery_id)
-                    # The 'image' field points to .../comics/<id>.jpg
-                    # We need .../images for page downloads
-                    return cdn.replace('/comics', '/images')
-        except (json.JSONDecodeError, ValueError, TypeError):
-            pass
+    ld = _get_jsonld_comic_issue(soup)
+    if ld:
+        image_url = ld.get('image', '')
+        if image_url:
+            cdn = _derive_cdn_base(image_url, gallery_id)
+            # The 'image' field points to .../comics/<id>.jpg
+            # We need .../images for page downloads
+            return cdn.replace('/comics', '/images')
 
     # Strategy 2: <link rel="preconnect"> tag
     for link in soup.find_all('link', rel='preconnect'):
         href = link.get('href', '')
         if 'cdn' in href or 'cdn3' in href:
-            # e.g. https://cdn.nhentai.com or https://cdn3.hentok.com
             return href.rstrip('/') + '/nhentai/storage/images'
 
     # Fallback

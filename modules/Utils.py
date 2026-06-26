@@ -1,7 +1,10 @@
 import io
+import json
 import os
 import shutil
 import subprocess
+import uuid
+from datetime import datetime, timezone
 
 import PIL
 from PIL import Image
@@ -121,3 +124,214 @@ def compress_existing_pdf(input_path: str, output_path: str | None = None) -> st
     print("         apt install ghostscript     (Linux)")
     print("       Or set is_compress=True / I2P(image_quality=85) for built-in JPEG compression.")
     return None
+
+
+# ======================================================================
+#  Download history  (stored under ``<output_dir>/.history/``)
+# ======================================================================
+
+def _history_dir(output_dir: str) -> str:
+    """Return the path to the .history folder (create it if missing)."""
+    path = os.path.join(output_dir, '.history')
+    # If an old flat file exists, rename it away before creating the directory
+    if os.path.isfile(path):
+        tmp = path + '.old'
+        os.rename(path, tmp)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _history_info_path(output_dir: str) -> str:
+    return os.path.join(_history_dir(output_dir), 'info')
+
+
+def _history_thumb_dir(output_dir: str) -> str:
+    p = os.path.join(_history_dir(output_dir), 'thumbnails')
+    os.makedirs(p, exist_ok=True)
+    return p
+
+
+def _migrate_old_history(output_dir: str) -> None:
+    """One-off: move old ``.history`` file / ``thumbnails/`` dir into the new folder."""
+    new_info = _history_info_path(output_dir)
+
+    # Old flat .history file (or .history.old from a previous rename)
+    for old_name in ('.history', '.history.old'):
+        old_path = os.path.join(output_dir, old_name)
+        if os.path.isfile(old_path) and not os.path.exists(new_info):
+            os.rename(old_path, new_info)
+            break
+
+    # Old thumbnails directory at the output root
+    old_thumb = os.path.join(output_dir, 'thumbnails')
+    new_thumb = os.path.join(_history_dir(output_dir), 'thumbnails')
+    if os.path.isdir(old_thumb) and not os.path.isdir(new_thumb):
+        # rmdir the empty new_thumb placeholder if it exists
+        try:
+            os.rmdir(new_thumb)
+        except OSError:
+            pass
+        os.rename(old_thumb, new_thumb)
+
+
+def record_history(output_dir: str, /, *, name: str, url: str,
+                   total: int, downloaded: int, thumb: str = '') -> None:
+    """
+    Append one download record to ``<output_dir>/.history/info`` (JSON Lines).
+
+    :param thumb: unique thumbnail filename from :func:`save_thumbnail`.
+    """
+    _migrate_old_history(output_dir)
+    info_path = _history_info_path(output_dir)
+
+    record = {
+        'name': name,
+        'url': url,
+        'total': total,
+        'downloaded': downloaded,
+        'timestamp': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+    }
+    if thumb:
+        record['thumb'] = thumb
+
+    with open(info_path, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(record, ensure_ascii=False) + '\n')
+
+
+def get_history(output_dir: str) -> list[dict]:
+    """
+    Read all history records from ``<output_dir>/.history/info``.
+
+    Returns a list of dicts (most recent first).  Missing / empty file → ``[]``.
+    """
+    _migrate_old_history(output_dir)
+    info_path = _history_info_path(output_dir)
+    if not os.path.exists(info_path):
+        return []
+
+    records = []
+    with open(info_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    records.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+
+    records.reverse()  # newest first
+    return records
+
+
+# ======================================================================
+#  Thumbnails  (stored under ``<output_dir>/.history/thumbnails/``)
+# ======================================================================
+
+def _sanitize_filename(name: str) -> str:
+    """Replace characters that are unsafe in filenames."""
+    unsafe = '<>:"/\\|?*'
+    for ch in unsafe:
+        name = name.replace(ch, '_')
+    return name[:120]
+
+
+def save_thumbnail(image: Image.Image, output_dir: str, name: str) -> str:
+    """
+    Save a small JPEG thumbnail with a unique filename.
+
+    Returns the **base filename** (e.g. ``abc_1a2b3c4d.jpg``) that should be
+    stored in the history record's ``thumb`` field.
+    """
+    thumb_dir = _history_thumb_dir(output_dir)
+
+    thumb = image.copy()
+    thumb.thumbnail((320, 480), Image.LANCZOS)
+
+    if thumb.mode in ('RGBA', 'LA', 'P'):
+        thumb = thumb.convert('RGB')
+
+    unique = uuid.uuid4().hex[:8]
+    fname = _sanitize_filename(name)[:100] + '_' + unique + '.jpg'
+    path = os.path.join(thumb_dir, fname)
+    thumb.save(path, format='JPEG', quality=75, optimize=True)
+    return path  # full path — callers use os.path.basename() for the thumb record field
+
+
+def _resolve_thumb_path(output_dir: str, record: dict) -> str | None:
+    """Return the thumbnail path for a history record, or *None*."""
+    thumb_dir = _history_thumb_dir(output_dir)
+
+    # New records have a 'thumb' field with the exact filename
+    thumb = record.get('thumb')
+    if thumb:
+        path = os.path.join(thumb_dir, thumb)
+        if os.path.exists(path):
+            return path
+
+    # Fallback for old records: derive from name
+    path = os.path.join(thumb_dir, _sanitize_filename(record['name']) + '.jpg')
+    return path if os.path.exists(path) else None
+
+
+def get_thumbnail_path(output_dir: str, name: str) -> str | None:
+    """Return the path to a saved thumbnail, or *None* if it doesn't exist."""
+    path = os.path.join(_history_thumb_dir(output_dir), _sanitize_filename(name) + '.jpg')
+    return path if os.path.exists(path) else None
+
+
+def thumbnail_to_base64(output_dir: str, record: dict) -> str | None:
+    """Return the thumbnail for *record* as a base64 data-URI, or *None*."""
+    path = _resolve_thumb_path(output_dir, record)
+    if not path:
+        return None
+    import base64
+    with open(path, 'rb') as f:
+        b64 = base64.b64encode(f.read()).decode('ascii')
+    return f'data:image/jpeg;base64,{b64}'
+
+
+def delete_history_record(output_dir: str, index: int) -> bool:
+    """
+    Delete one history record (1-based index, newest = 1) and its thumbnail.
+
+    Returns True on success, False if the index is out of range.
+    """
+    _migrate_old_history(output_dir)
+    info_path = _history_info_path(output_dir)
+    if not os.path.exists(info_path):
+        return False
+
+    # Read all records (oldest-first in file)
+    records = []
+    with open(info_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    records.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+
+    # Convert 1-based newest-first index → position in the file array
+    # File order = oldest-first  →  reverse = newest-first
+    # index 1 = newest = records[-1]
+    # index N = oldest  = records[0]
+    if index < 1 or index > len(records):
+        return False
+
+    target = records.pop(-index)  # -1 = last = newest
+
+    # Rewrite the info file
+    with open(info_path, 'w', encoding='utf-8') as f:
+        for r in records:
+            f.write(json.dumps(r, ensure_ascii=False) + '\n')
+
+    # Delete the thumbnail (uses unique thumb field if available)
+    thumb_path = _resolve_thumb_path(output_dir, target)
+    if thumb_path:
+        try:
+            os.remove(thumb_path)
+        except OSError:
+            pass
+
+    return True

@@ -3,4 +3,5 @@ natsort
 pillow
 reportlab
 requests
+gradio
 tqdm

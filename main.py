@@ -1,6 +1,32 @@
+import os
+
 from modules import nhentai
-from modules.eromanga import get_images
+from modules.Utils import record_history, save_thumbnail
+from modules.eromanga import get_images, scrape_info as scrape_eromanga
 from modules.ptf.i2p import I2P
+
+
+def _download_and_convert(info: dict, images: list, name: str, url: str):
+    """Shared pipeline: download images → thumbnail → PDF → history."""
+    if not images:
+        print(f"[WARN] No images for {name!r} — skipping PDF generation.")
+        return
+
+    thumb_path = save_thumbnail(images[0], I2P.output_dir, name)
+
+    converter = I2P(images=images, pdf_name=name, is_compress=False)
+    converter.convert_images_to_pdf()
+
+    total = info.get('final', len(images))
+    record_history(
+        I2P.output_dir,
+        name=name,
+        url=url,
+        total=total,
+        downloaded=len(images),
+        thumb=os.path.basename(thumb_path),
+    )
+
 
 # ======================================================================
 # Mode A — drop nhentai.com URLs here, everything else is automatic
@@ -10,53 +36,41 @@ nhentai_urls = [
 ]
 
 # ======================================================================
-# Mode B — eromanga-show.com viewer URLs
+# Mode B — drop eromanga-show.com article URLs here
 # ======================================================================
 eromanga_urls = [
+    'https://eromanga-show.com/articles/2920939',
 ]
 
 # ======================================================================
 # Mode C — manual metadata (if you already know the gallery id / format)
+#   Format: {'name': str, 'final': int, 'id': int, 'format': str}
 # ======================================================================
 infos = [
-    # {
-    #     'name': "[うるりひ老師 (うるりひ)] 海瀬蒼羽はキミだけのモノになりたい♡ [中国翻訳] [DL版]",
-    #     'final': 106,
-    #     'id': 581073,
-    #     'format': 'webp'
-    # },
 ]
 
 
 if __name__ == '__main__':
     # ---- Mode A: nhentai.com URLs (auto-scrape) ----
-    if nhentai_urls:
-        for url in nhentai_urls:
-            info = nhentai.scrape_info(url)
-            if info is None:
-                print(f"[ERROR] Skipping {url} — scraping failed.")
-                continue
+    for url in nhentai_urls:
+        info = nhentai.scrape_info(url)
+        if info is None:
+            print(f"[ERROR] Skipping {url} — scraping failed.")
+            continue
+        print(f"\nProcessing: {info['name']}")
+        _download_and_convert(info, nhentai.get_images(info), info['name'], url)
 
-            print(f"\nProcessing: {info['name']}")
-            images = nhentai.get_images(info)
-            if images:
-                converter = I2P(images=images, pdf_name=info['name'], is_compress=False)
-                converter.convert_images_to_pdf()
-
-    # ---- Mode B: eromanga-show.com URLs ----
-    if eromanga_urls:
-        for item in eromanga_urls:
-            print(f"Processing: {item['name']}")
-            images = get_images(url=item['url'])
-            if images:
-                converter = I2P(images=images, pdf_name=item['name'], is_compress=False)
-                converter.convert_images_to_pdf()
+    # ---- Mode B: eromanga-show.com article URLs (auto-scrape) ----
+    for url in eromanga_urls:
+        info = scrape_eromanga(url)
+        if info is None:
+            print(f"[ERROR] Skipping {url} — scraping failed.")
+            continue
+        print(f"\nProcessing: {info['name']}")
+        _download_and_convert(info, get_images(url), info['name'], url)
 
     # ---- Mode C: manual metadata ----
-    if infos:
-        for info in infos:
-            print(f"Processing: {info['name']}")
-            images = nhentai.get_images(info)
-            if images:
-                converter = I2P(images=images, pdf_name=info['name'], is_compress=False)
-                converter.convert_images_to_pdf()
+    for info in infos:
+        url = f"https://nhentai.net/g/{info['id']}/"
+        print(f"Processing: {info['name']}")
+        _download_and_convert(info, nhentai.get_images(info), info['name'], url)
