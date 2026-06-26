@@ -1,7 +1,7 @@
 import os
 
 from modules import nhentai
-from modules.Utils import record_history, save_thumbnail
+from modules.utils import record_history, save_thumbnail
 from modules.eromanga import get_images, scrape_info as scrape_eromanga
 from modules.ptf.i2p import I2P
 

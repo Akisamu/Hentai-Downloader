@@ -10,7 +10,7 @@ from PIL import Image
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
-from modules.Utils import check_image_integrity
+from modules.utils import check_image_integrity
 
 # ---------------------------------------------------------------------------
 # Anti-scraping: mimic a real browser as closely as possible

@@ -9,7 +9,7 @@ import urllib.parse
 import gradio as gr
 from modules import nhentai
 from modules.eromanga import get_images as ero_get_images, scrape_info as ero_scrape_info
-from modules.Utils import (
+from modules.utils import (
     _sanitize_filename,
     delete_history_record,
     get_history,
@@ -41,8 +41,8 @@ if getattr(_sys, 'frozen', False):
     _ROOT = _sys._MEIPASS
 else:
     _ROOT = os.path.dirname(os.path.abspath(__file__))
-_COMICS_ICON = os.path.join(_ROOT, 'comics.icon.webp')
-_EROMANGA_ICON = os.path.join(_ROOT, 'eromanga.icon.png')
+_COMICS_ICON = os.path.join(_ROOT, 'assets', 'icon_comics.webp')
+_EROMANGA_ICON = os.path.join(_ROOT, 'assets', 'icon_eromanga.png')
 
 
 def _icon_b64(path: str) -> str:
